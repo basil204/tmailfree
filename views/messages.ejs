@@ -10,15 +10,45 @@
       <th>Subject</th>
       <th>From</th>
       <th>Received At</th>
+      <th>OTP</th>
       <th>Actions</th>
     </tr>
   </thead>
   <tbody id="message-list">
-    <% messages.forEach(msg => { %>
+    <% 
+      // Hàm tìm OTP cho từng message
+      function findOtp(msg) {
+        const regex = /\b\d{4,8}\b/g;
+        // Tìm trong subject trước
+        if(msg.subject){
+          let m = msg.subject.match(regex);
+          if(m && m.length > 0) return m[0];
+        }
+        // Tìm trong content (loại bỏ tag HTML)
+        if(msg.content){
+          let text = msg.content.replace(/<[^>]*>?/gm, '');
+          let m = text.match(regex);
+          if(m && m.length > 0) return m[0];
+        }
+        return '';
+      }
+    %>
+
+    <% messages.forEach(msg => { 
+      const otp = findOtp(msg);
+    %>
       <tr>
         <td><%= msg.subject %></td>
         <td><%= msg.from %> &lt;<%= msg.from_email %>&gt;</td>
         <td><%= msg.receivedAt %></td>
+        <td>
+          <% if (otp) { %>
+            <span class="otp-text"><%= otp %></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-1 copy-otp-btn" data-otp="<%= otp %>">Copy</button>
+          <% } else { %>
+            <em>Không có</em>
+          <% } %>
+        </td>
         <td>
           <a href="/messages/<%= msg.id %>" class="btn btn-sm btn-info">Xem Chi Tiết</a>
         </td>
@@ -28,47 +58,49 @@
 </table>
 
 <script>
-  const email = "<%= email %>";
-  const noMsgAlert = document.getElementById('no-messages-alert');
-  const table = document.getElementById('messages-table');
-  const messageList = document.getElementById('message-list');
+  document.addEventListener('DOMContentLoaded', () => {
+    // Xử lý copy OTP nút từng dòng
+    document.querySelectorAll('.copy-otp-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const otp = button.getAttribute('data-otp');
+        if (!otp) return;
 
-  async function fetchMessages() {
-    try {
-      const res = await fetch(`/api/messages/${encodeURIComponent(email)}`);
-      const data = await res.json();
-      if (data.success) {
-        if (data.messages.length === 0) {
-          if (noMsgAlert) noMsgAlert.style.display = 'block';
-          if (table) table.style.display = 'none';
-          messageList.innerHTML = '';
-        } else {
-          if (noMsgAlert) noMsgAlert.style.display = 'none';
-          if (table) table.style.display = 'table-row-group' || 'table';
-
-          // Tạo lại nội dung tbody
-          messageList.innerHTML = '';
-          data.messages.forEach(msg => {
-            const tr = document.createElement('tr');
-
-            tr.innerHTML = `
-              <td>${msg.subject}</td>
-              <td>${msg.from} &lt;${msg.from_email}&gt;</td>
-              <td>${msg.receivedAt}</td>
-              <td><a href="/messages/${msg.id}" class="btn btn-sm btn-info">Xem Chi Tiết</a></td>
-            `;
-
-            messageList.appendChild(tr);
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(otp).then(() => {
+            const originalText = button.textContent;
+            button.textContent = 'Copied!';
+            button.disabled = true;
+            setTimeout(() => {
+              button.textContent = originalText;
+              button.disabled = false;
+            }, 1500);
+          }).catch(() => {
+            alert('Không thể copy OTP, vui lòng copy thủ công.');
           });
+        } else {
+          // fallback cho trình duyệt cũ
+          const textarea = document.createElement('textarea');
+          textarea.value = otp;
+          document.body.appendChild(textarea);
+          textarea.select();
+          try {
+            document.execCommand('copy');
+            const originalText = button.textContent;
+            button.textContent = 'Copied!';
+            button.disabled = true;
+            setTimeout(() => {
+              button.textContent = originalText;
+              button.disabled = false;
+            }, 1500);
+          } catch (err) {
+            alert('Không thể copy OTP, vui lòng copy thủ công.');
+          }
+          document.body.removeChild(textarea);
         }
-      }
-    } catch (error) {
-      console.error('Lỗi khi tải tin nhắn:', error);
-    }
-  }
+      });
+    });
 
-  // Lặp lại mỗi 5 giây
-  setInterval(fetchMessages, 5000);
+    // Bạn giữ nguyên phần fetch tin nhắn tự động nếu muốn,
+    // Nhưng cần xử lý cập nhật OTP lại sau khi load data mới (tương tự)
+  });
 </script>
-<a href="/emails" class="btn btn-secondary mt-3">Quay lại Danh sách Email</a>
-<a href="/" class="btn btn-secondary mt-3">Quay lại Trang chủ</a>

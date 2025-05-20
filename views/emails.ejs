@@ -3,21 +3,31 @@
 <% if (emails.length === 0) { %>
   <div class="alert alert-info">Chưa tạo email nào. Vui lòng tạo email mới.</div>
 <% } else { %>
-<table class="table table-hover">
+<table class="table table-hover" id="emails-table">
   <thead>
     <tr>
       <th>Email</th>
       <th>Domain</th>
       <th>Expire At</th>
+      <th>Số lượng Messages</th>
+      <th>OTP mới nhất</th>
       <th>Actions</th>
     </tr>
   </thead>
   <tbody>
     <% emails.forEach(email => { %>
-      <tr>
-        <td><%= email.email %></td>
+      <tr data-email="<%= email.email %>">
+        <td>
+          <span class="email-text"><%= email.email %></span>
+          <button type="button" class="btn btn-sm btn-outline-secondary ms-2 copy-email-btn" data-email="<%= email.email %>">Copy</button>
+        </td>
         <td><%= email.domain %></td>
         <td><%= new Date(email.expire_at).toLocaleString() %></td>
+        <td class="msg-count">Đang tải...</td>
+        <td class="otp-text">
+          <span class="otp-value"></span>
+          <button type="button" class="btn btn-sm btn-outline-secondary ms-1 copy-otp-btn" style="display:none;">Copy OTP</button>
+        </td>
         <td>
           <a href="/emails/<%= encodeURIComponent(email.email) %>/messages" class="btn btn-sm btn-primary">Xem Messages</a>
           <form action="/emails/<%= encodeURIComponent(email.email) %>/delete" method="POST" style="display:inline-block" onsubmit="return confirm('Bạn có chắc muốn xóa email này?');">
@@ -29,5 +39,81 @@
   </tbody>
 </table>
 <% } %>
-<a href="/create-email" class="btn btn-primary">Tạo Email Mới</a>
-<a href="/" class="btn btn-secondary">Quay lại Trang chủ</a>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Copy email
+    document.querySelectorAll('.copy-email-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const email = button.getAttribute('data-email');
+        if (!email) return;
+
+        navigator.clipboard.writeText(email).then(() => {
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          button.disabled = true;
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+          }, 1500);
+        }).catch(() => {
+          alert('Không thể copy email, vui lòng copy thủ công.');
+        });
+      });
+    });
+
+    // Hàm copy OTP cho từng dòng
+    function attachCopyOtpHandlers() {
+      document.querySelectorAll('.copy-otp-btn').forEach(btn => {
+        btn.onclick = () => {
+          const otp = btn.previousElementSibling.textContent.trim();
+          if (!otp) return;
+          navigator.clipboard.writeText(otp).then(() => {
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.disabled = true;
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.disabled = false;
+            }, 1500);
+          }).catch(() => alert('Không thể copy OTP, vui lòng copy thủ công.'));
+        };
+      });
+    }
+
+    // Hàm cập nhật số lượng message và OTP từng email
+    async function updateEmailInfo() {
+      const rows = document.querySelectorAll('#emails-table tbody tr[data-email]');
+      for (const row of rows) {
+        const email = row.getAttribute('data-email');
+        try {
+          const res = await fetch(`/api/email-info/${encodeURIComponent(email)}`);
+          const data = await res.json();
+          if (data.success) {
+            // Cập nhật số lượng message
+            const msgCountCell = row.querySelector('.msg-count');
+            if (msgCountCell) msgCountCell.textContent = data.count;
+
+            // Cập nhật OTP và nút copy
+            const otpSpan = row.querySelector('.otp-value');
+            const copyOtpBtn = row.querySelector('.copy-otp-btn');
+            if (data.otp) {
+              otpSpan.textContent = data.otp;
+              if (copyOtpBtn) copyOtpBtn.style.display = 'inline-block';
+            } else {
+              otpSpan.textContent = '';
+              if (copyOtpBtn) copyOtpBtn.style.display = 'none';
+            }
+          }
+        } catch (e) {
+          // Có thể để trống hoặc báo lỗi nếu cần
+          console.error('Lỗi khi lấy info email', email, e);
+        }
+      }
+      attachCopyOtpHandlers();
+    }
+
+    updateEmailInfo();
+    setInterval(updateEmailInfo, 8000); // 8 giây update 1 lần
+  });
+</script>

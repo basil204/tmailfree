@@ -2,6 +2,7 @@ const express = require('express');
 const expressLayouts = require('express-ejs-layouts');
 const axios = require('axios');
 const path = require('path');
+
 const app = express();
 
 const API_KEY = 'QLNiaP7mmXtfWCcwnhao6dSoLT2xVvE';
@@ -16,10 +17,9 @@ app.set('layout', 'layout');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const allowedDomains = ['manhnl.dev', 'userdhieu.id.vn', 'phimmoichillf.com','manhit.dev'];
-let emailsCreated = [];
+const allowedDomains = ['manhnl.dev', 'userdhieu.id.vn', 'phimmoichillf.com'];
 
-// Trang chủ: show 3 domain cố định
+// Trang chủ
 app.get('/', (req, res) => {
   const domains = allowedDomains.map(d => ({ domain: d, type: 'Free' }));
   res.render('index', { domains, title: 'Danh sách Domains', error: null });
@@ -30,92 +30,102 @@ app.get('/create-email', (req, res) => {
   res.render('create_email', { domains: allowedDomains, error: null, title: 'Tạo Email Mới' });
 });
 
-// Xử lý tạo email
+// POST tạo email - trả JSON
 app.post('/create-email', async (req, res) => {
   let { username, domain } = req.body;
 
-  // Nếu domain không chọn hoặc không hợp lệ thì random domain trong 3 domain
+  // Nếu domain không chọn hoặc không hợp lệ thì random domain
   if (!domain || !allowedDomains.includes(domain)) {
     const randomIndex = Math.floor(Math.random() * allowedDomains.length);
     domain = allowedDomains[randomIndex];
   }
 
   try {
-    // Bước 1: tạo email mặc định random username + domain mặc định của API
     const createResp = await axios.post(`${API_BASE}/emails/${API_KEY}`);
     if (!createResp.data.status) {
-      return res.render('create_email', { domains: allowedDomains, error: 'Tạo email thất bại ở bước tạo mặc định', title: 'Tạo Email Mới' });
+      return res.status(500).json({ success: false, message: 'Tạo email thất bại ở bước tạo mặc định' });
     }
 
     let finalEmailData = createResp.data.data;
 
-    // Nếu user nhập username hợp lệ, thì update email
     if (username && username.trim() !== '') {
       username = username.trim();
 
       if (!/^[a-zA-Z0-9._%+-]+$/.test(username)) {
-        return res.render('create_email', { domains: allowedDomains, error: 'Username chứa ký tự không hợp lệ', title: 'Tạo Email Mới' });
+        return res.status(400).json({ success: false, message: 'Username chứa ký tự không hợp lệ' });
       }
 
       const oldEmail = finalEmailData.email;
       const updateResp = await axios.post(`${API_BASE}/emails/${API_KEY}/${encodeURIComponent(oldEmail)}/${encodeURIComponent(username)}/${encodeURIComponent(domain)}`);
 
       if (!updateResp.data.status) {
-        return res.render('create_email', { domains: allowedDomains, error: 'Cập nhật email thất bại', title: 'Tạo Email Mới' });
+        return res.status(500).json({ success: false, message: 'Cập nhật email thất bại' });
       }
 
       finalEmailData = updateResp.data.data;
     } else {
-      // Nếu user bỏ trống username, giữ nguyên email random của API
-      // Nhưng thay domain thành domain đã random hoặc chọn nếu domain API khác
-      // Nếu domain API khác với domain random/chọn, gọi update email chỉ đổi domain thôi
+      // Nếu username trống, check domain có khác domain mặc định API không để update domain
       if (finalEmailData.domain !== domain) {
         const oldEmail = finalEmailData.email;
-        // Lấy username hiện tại từ email cũ (phần trước @)
         const oldUsername = oldEmail.split('@')[0];
         const updateResp = await axios.post(`${API_BASE}/emails/${API_KEY}/${encodeURIComponent(oldEmail)}/${encodeURIComponent(oldUsername)}/${encodeURIComponent(domain)}`);
 
         if (!updateResp.data.status) {
-          return res.render('create_email', { domains: allowedDomains, error: 'Cập nhật domain email thất bại', title: 'Tạo Email Mới' });
+          return res.status(500).json({ success: false, message: 'Cập nhật domain email thất bại' });
         }
 
         finalEmailData = updateResp.data.data;
       }
     }
 
-    emailsCreated.push(finalEmailData);
-    res.redirect('/emails');
+    res.json({ success: true, email: finalEmailData });
 
   } catch (e) {
-    console.error(e);
-    res.render('create_email', { domains: allowedDomains, error: 'Lỗi kết nối API', title: 'Tạo Email Mới' });
+    res.status(500).json({ success: false, message: 'Lỗi kết nối API' });
   }
 });
 
-
-// Danh sách email đã tạo
+// Trang emails đọc từ localStorage
 app.get('/emails', (req, res) => {
-  res.render('emails', { emails: emailsCreated, title: 'Danh sách Email đã tạo', error: null });
+  res.render('emails_localstorage', { title: 'Danh sách Email đã tạo' });
 });
 
-// Xóa email khỏi cache
-app.post('/emails/:email/delete', (req, res) => {
-  const emailToDelete = req.params.email;
-  emailsCreated = emailsCreated.filter(e => e.email !== emailToDelete);
-  res.redirect('/emails');
-});
-// API trả về JSON tin nhắn cho email (dùng AJAX)
-app.get('/api/messages/:email', async (req, res) => {
+// API lấy số lượng messages và OTP cho email
+app.get('/api/email-info/:email', async (req, res) => {
   try {
     const email = req.params.email;
     const response = await axios.get(`${API_BASE}/messages/${API_KEY}/${email}`);
-    if (response.data.status) {
-      res.json({ success: true, messages: response.data.messages });
-    } else {
-      res.json({ success: false, messages: [] });
+    if (!response.data.status) return res.json({ success: false });
+
+    const messages = response.data.messages || [];
+
+    const findOtp = (msg) => {
+      const regex = /\b\d{4,8}\b/g;
+      if (msg.subject) {
+        const m = msg.subject.match(regex);
+        if (m && m.length) return m[0];
+      }
+      if (msg.content) {
+        const text = msg.content.replace(/<[^>]*>?/gm, '');
+        const m = text.match(regex);
+        if (m && m.length) return m[0];
+      }
+      return null;
+    };
+
+    let otp = null;
+    for (const msg of messages) {
+      otp = findOtp(msg);
+      if (otp) break;
     }
+
+    res.json({
+      success: true,
+      count: messages.length,
+      otp: otp || '',
+    });
   } catch (e) {
-    res.json({ success: false, messages: [] });
+    res.json({ success: false });
   }
 });
 

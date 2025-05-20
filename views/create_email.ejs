@@ -4,7 +4,7 @@
   <div class="alert alert-danger"><%= error %></div>
 <% } %>
 
-<form method="POST" action="/create-email" class="mb-3">
+<form id="create-email-form" class="mb-3">
   <div class="mb-3">
     <label for="username" class="form-label">Username (phần trước @):</label>
     <input
@@ -31,5 +31,41 @@
   <button type="submit" class="btn btn-primary">Tạo Email</button>
 </form>
 
-<a href="/" class="btn btn-secondary">Quay lại Trang chủ</a>
-<a href="/emails" class="btn btn-secondary">Quay lại Danh sách Email</a>
+<a href="/emails" class="btn btn-secondary">Xem Danh Sách Email</a>
+
+<script>
+  document.getElementById('create-email-form').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const form = e.target;
+    const formData = new FormData(form);
+    const data = new URLSearchParams(formData);
+
+    try {
+      const res = await fetch('/create-email', {
+        method: 'POST',
+        body: data,
+      });
+      const result = await res.json();
+
+      if (result.success) {
+        // Lấy danh sách email hiện có
+        let emails = localStorage.getItem('createdEmails');
+        emails = emails ? JSON.parse(emails) : [];
+
+        // Thêm email mới (nếu chưa có)
+        if (!emails.find(e => e.email === result.email.email)) {
+          emails.push(result.email);
+          localStorage.setItem('createdEmails', JSON.stringify(emails));
+        }
+
+        alert(`Tạo email thành công: ${result.email.email}`);
+        window.location.href = '/emails';
+      } else {
+        alert(result.message || 'Lỗi tạo email');
+      }
+    } catch (err) {
+      alert('Lỗi kết nối tới server');
+    }
+  });
+</script>

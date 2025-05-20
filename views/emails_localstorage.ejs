@@ -1,0 +1,166 @@
+<h1>Email đã tạo (dữ liệu lưu trên máy bạn)</h1>
+
+<div id="no-emails" class="alert alert-info" style="display:none;">Chưa tạo email nào. Vui lòng tạo email mới.</div>
+
+<table class="table table-hover" id="emails-table" style="display:none;">
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Domain</th>
+      <th>Expire At</th>
+      <th>Số lượng Messages</th>
+      <th>OTP mới nhất</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="emails-tbody">
+  </tbody>
+</table>
+
+<script>
+  function loadEmailsFromLocalStorage() {
+    const data = localStorage.getItem('createdEmails');
+    if (!data) return [];
+    try {
+      return JSON.parse(data);
+    } catch {
+      return [];
+    }
+  }
+
+  function saveEmailsToLocalStorage(emails) {
+    localStorage.setItem('createdEmails', JSON.stringify(emails));
+  }
+
+  function removeEmailFromLocalStorage(email) {
+    let emails = loadEmailsFromLocalStorage();
+    emails = emails.filter(e => e.email !== email);
+    saveEmailsToLocalStorage(emails);
+  }
+
+  function createEmailRow(emailData) {
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-email', emailData.email);
+
+    tr.innerHTML = `
+      <td>
+        <span class="email-text">${emailData.email}</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 copy-email-btn" data-email="${emailData.email}">Copy</button>
+      </td>
+      <td>${emailData.domain}</td>
+      <td>${new Date(emailData.expire_at).toLocaleString()}</td>
+      <td class="msg-count">Đang tải...</td>
+      <td class="otp-text">
+        <span class="otp-value"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1 copy-otp-btn" style="display:none;">Copy OTP</button>
+      </td>
+      <td>
+        <a href="/emails/${encodeURIComponent(emailData.email)} /messages" class="btn btn-sm btn-primary">Xem Messages</a>
+        <button type="button" class="btn btn-sm btn-danger btn-delete-email">Xóa</button>
+      </td>
+    `;
+    return tr;
+  }
+
+  async function updateEmailInfo(emailRow) {
+    const email = emailRow.getAttribute('data-email');
+    try {
+      const res = await fetch(`/api/email-info/${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data.success) {
+        const msgCountCell = emailRow.querySelector('.msg-count');
+        const otpSpan = emailRow.querySelector('.otp-value');
+        const copyOtpBtn = emailRow.querySelector('.copy-otp-btn');
+
+        if (msgCountCell) msgCountCell.textContent = data.count;
+
+        if (data.otp) {
+          otpSpan.textContent = data.otp;
+          if (copyOtpBtn) copyOtpBtn.style.display = 'inline-block';
+        } else {
+          otpSpan.textContent = '';
+          if (copyOtpBtn) copyOtpBtn.style.display = 'none';
+        }
+      }
+    } catch {
+      // ignore error
+    }
+  }
+
+  function attachEventHandlers() {
+    document.querySelectorAll('.copy-email-btn').forEach(button => {
+      button.onclick = () => {
+        const email = button.getAttribute('data-email');
+        if (!email) return;
+        navigator.clipboard.writeText(email).then(() => {
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          button.disabled = true;
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+          }, 1500);
+        }).catch(() => alert('Không thể copy email, vui lòng copy thủ công.'));
+      };
+    });
+
+    document.querySelectorAll('.copy-otp-btn').forEach(button => {
+      button.onclick = () => {
+        const otp = button.previousElementSibling.textContent.trim();
+        if (!otp) return;
+        navigator.clipboard.writeText(otp).then(() => {
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          button.disabled = true;
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+          }, 1500);
+        }).catch(() => alert('Không thể copy OTP, vui lòng copy thủ công.'));
+      };
+    });
+
+    document.querySelectorAll('.btn-delete-email').forEach(button => {
+      button.onclick = () => {
+        if (!confirm('Bạn có chắc muốn xóa email này?')) return;
+        const tr = button.closest('tr');
+        const email = tr.getAttribute('data-email');
+        removeEmailFromLocalStorage(email);
+        tr.remove();
+        if (document.querySelectorAll('#emails-tbody tr').length === 0) {
+          document.getElementById('emails-table').style.display = 'none';
+          document.getElementById('no-emails').style.display = 'block';
+        }
+      };
+    });
+  }
+
+  function renderEmails() {
+    const emails = loadEmailsFromLocalStorage();
+    const tbody = document.getElementById('emails-tbody');
+    tbody.innerHTML = '';
+
+    if (emails.length === 0) {
+      document.getElementById('no-emails').style.display = 'block';
+      document.getElementById('emails-table').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('no-emails').style.display = 'none';
+    document.getElementById('emails-table').style.display = 'table';
+
+    emails.forEach(email => {
+      const tr = createEmailRow(email);
+      tbody.appendChild(tr);
+      updateEmailInfo(tr);
+    });
+
+    attachEventHandlers();
+  }
+
+  renderEmails();
+
+  setInterval(() => {
+    document.querySelectorAll('#emails-tbody tr').forEach(row => updateEmailInfo(row));
+  }, 8000);
+</script>
