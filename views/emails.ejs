@@ -42,46 +42,101 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    // Copy email
+    // Copy Email
     document.querySelectorAll('.copy-email-btn').forEach(button => {
       button.addEventListener('click', () => {
         const email = button.getAttribute('data-email');
         if (!email) return;
 
-        navigator.clipboard.writeText(email).then(() => {
-          const originalText = button.textContent;
-          button.textContent = 'Copied!';
-          button.disabled = true;
-          setTimeout(() => {
-            button.textContent = originalText;
-            button.disabled = false;
-          }, 1500);
-        }).catch(() => {
-          alert('Không thể copy email, vui lòng copy thủ công.');
-        });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(email).then(() => {
+            const originalText = button.textContent;
+            button.textContent = 'Copied!';
+            button.disabled = true;
+            setTimeout(() => {
+              button.textContent = originalText;
+              button.disabled = false;
+            }, 1500);
+          }).catch(() => {
+            alert('Không thể copy email, vui lòng copy thủ công.');
+          });
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = email;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+
+          try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+              const originalText = button.textContent;
+              button.textContent = 'Copied!';
+              button.disabled = true;
+              setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+              }, 1500);
+            } else {
+              alert('Không thể copy email, vui lòng copy thủ công.');
+            }
+          } catch {
+            alert('Không thể copy email, vui lòng copy thủ công.');
+          }
+
+          document.body.removeChild(textarea);
+        }
       });
     });
 
-    // Hàm copy OTP cho từng dòng
+    // Copy OTP
     function attachCopyOtpHandlers() {
       document.querySelectorAll('.copy-otp-btn').forEach(btn => {
         btn.onclick = () => {
           const otp = btn.previousElementSibling.textContent.trim();
           if (!otp) return;
-          navigator.clipboard.writeText(otp).then(() => {
-            const originalText = btn.textContent;
-            btn.textContent = 'Copied!';
-            btn.disabled = true;
-            setTimeout(() => {
-              btn.textContent = originalText;
-              btn.disabled = false;
-            }, 1500);
-          }).catch(() => alert('Không thể copy OTP, vui lòng copy thủ công.'));
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(otp).then(() => {
+              const originalText = btn.textContent;
+              btn.textContent = 'Copied!';
+              btn.disabled = true;
+              setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+              }, 1500);
+            }).catch(() => alert('Không thể copy OTP, vui lòng copy thủ công.'));
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = otp;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+              const successful = document.execCommand('copy');
+              if (successful) {
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.disabled = true;
+                setTimeout(() => {
+                  btn.textContent = originalText;
+                  btn.disabled = false;
+                }, 1500);
+              } else {
+                alert('Không thể copy OTP, vui lòng copy thủ công.');
+              }
+            } catch {
+              alert('Không thể copy OTP, vui lòng copy thủ công.');
+            }
+            document.body.removeChild(textarea);
+          }
         };
       });
     }
 
-    // Hàm cập nhật số lượng message và OTP từng email
+    // Cập nhật số lượng message và OTP từng email
     async function updateEmailInfo() {
       const rows = document.querySelectorAll('#emails-table tbody tr[data-email]');
       for (const row of rows) {
@@ -90,11 +145,9 @@
           const res = await fetch(`/api/email-info/${encodeURIComponent(email)}`);
           const data = await res.json();
           if (data.success) {
-            // Cập nhật số lượng message
             const msgCountCell = row.querySelector('.msg-count');
             if (msgCountCell) msgCountCell.textContent = data.count;
 
-            // Cập nhật OTP và nút copy
             const otpSpan = row.querySelector('.otp-value');
             const copyOtpBtn = row.querySelector('.copy-otp-btn');
             if (data.otp) {
@@ -106,7 +159,6 @@
             }
           }
         } catch (e) {
-          // Có thể để trống hoặc báo lỗi nếu cần
           console.error('Lỗi khi lấy info email', email, e);
         }
       }
@@ -114,6 +166,6 @@
     }
 
     updateEmailInfo();
-    setInterval(updateEmailInfo, 8000); // 8 giây update 1 lần
+    setInterval(updateEmailInfo, 8000);
   });
 </script>
