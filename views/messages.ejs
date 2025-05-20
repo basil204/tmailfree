@@ -1,0 +1,74 @@
+<h1>Tin nhắn email: <%= email %></h1>
+
+<% if (messages.length === 0) { %>
+  <div class="alert alert-info" id="no-messages-alert">Chưa có tin nhắn nào.</div>
+<% } %>
+
+<table class="table table-bordered table-hover" id="messages-table" style="<%= messages.length === 0 ? 'display:none;' : '' %>">
+  <thead>
+    <tr>
+      <th>Subject</th>
+      <th>From</th>
+      <th>Received At</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="message-list">
+    <% messages.forEach(msg => { %>
+      <tr>
+        <td><%= msg.subject %></td>
+        <td><%= msg.from %> &lt;<%= msg.from_email %>&gt;</td>
+        <td><%= msg.receivedAt %></td>
+        <td>
+          <a href="/messages/<%= msg.id %>" class="btn btn-sm btn-info">Xem Chi Tiết</a>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+
+<script>
+  const email = "<%= email %>";
+  const noMsgAlert = document.getElementById('no-messages-alert');
+  const table = document.getElementById('messages-table');
+  const messageList = document.getElementById('message-list');
+
+  async function fetchMessages() {
+    try {
+      const res = await fetch(`/api/messages/${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data.success) {
+        if (data.messages.length === 0) {
+          if (noMsgAlert) noMsgAlert.style.display = 'block';
+          if (table) table.style.display = 'none';
+          messageList.innerHTML = '';
+        } else {
+          if (noMsgAlert) noMsgAlert.style.display = 'none';
+          if (table) table.style.display = 'table-row-group' || 'table';
+
+          // Tạo lại nội dung tbody
+          messageList.innerHTML = '';
+          data.messages.forEach(msg => {
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+              <td>${msg.subject}</td>
+              <td>${msg.from} &lt;${msg.from_email}&gt;</td>
+              <td>${msg.receivedAt}</td>
+              <td><a href="/messages/${msg.id}" class="btn btn-sm btn-info">Xem Chi Tiết</a></td>
+            `;
+
+            messageList.appendChild(tr);
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải tin nhắn:', error);
+    }
+  }
+
+  // Lặp lại mỗi 5 giây
+  setInterval(fetchMessages, 5000);
+</script>
+<a href="/emails" class="btn btn-secondary mt-3">Quay lại Danh sách Email</a>
+<a href="/" class="btn btn-secondary mt-3">Quay lại Trang chủ</a>

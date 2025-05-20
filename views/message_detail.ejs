@@ -1,0 +1,29 @@
+<h1>Chi tiết tin nhắn: <%= message.subject %></h1>
+
+<ul class="list-group mb-3">
+  <li class="list-group-item"><strong>From:</strong> <%= message.from %> &lt;<%= message.from_email %>&gt;</li>
+  <li class="list-group-item"><strong>To:</strong> <%= message.to %></li>
+  <li class="list-group-item"><strong>Received At:</strong> <%= message.receivedAt %></li>
+</ul>
+
+<div>
+  <h5>Nội dung:</h5>
+  <% if (message.html) { %>
+    <div style="border:1px solid #ddd; padding:15px; border-radius:5px;">
+      <%- message.content %>
+    </div>
+  <% } else { %>
+    <pre><%= message.content %></pre>
+  <% } %>
+</div>
+
+<% if (message.attachments && message.attachments.length > 0) { %>
+  <h5 class="mt-4">Attachments:</h5>
+  <ul>
+    <% message.attachments.forEach(att => { %>
+      <li><a href="<%= att.url %>" target="_blank"><%= att.name %> (<%= att.size %> bytes)</a></li>
+    <% }) %>
+  </ul>
+<% } %>
+
+<a href="javascript:history.back()" class="btn btn-secondary mt-3">Quay lại</a>

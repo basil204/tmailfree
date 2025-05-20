@@ -1,0 +1,21 @@
+<h1>Danh sách Domains (3 domain được chọn)</h1>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Domain</th>
+      <th>Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% domains.forEach(domain => { %>
+      <tr>
+        <td><%= domain.domain %></td>
+        <td><%= domain.type %></td>
+      </tr>
+    <% }) %>
+    <% if(domains.length === 0) { %>
+      <tr><td colspan="2" class="text-center">Không có domain nào</td></tr>
+    <% } %>
+  </tbody>
+</table>

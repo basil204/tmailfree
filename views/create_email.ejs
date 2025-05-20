@@ -1,0 +1,35 @@
+<h1>Tạo Email Mới</h1>
+
+<% if (error) { %>
+  <div class="alert alert-danger"><%= error %></div>
+<% } %>
+
+<form method="POST" action="/create-email" class="mb-3">
+  <div class="mb-3">
+    <label for="username" class="form-label">Username (phần trước @):</label>
+    <input
+      type="text"
+      id="username"
+      name="username"
+      class="form-control"
+      placeholder="Nhập username (bỏ trống để random)"
+      pattern="[a-zA-Z0-9._%+-]*"
+      title="Chỉ dùng ký tự, số, ., _, %, +, - hoặc bỏ trống"
+    />
+  </div>
+
+  <div class="mb-3">
+    <label for="domain" class="form-label">Chọn Domain (bỏ trống để random):</label>
+    <select id="domain" name="domain" class="form-select">
+      <option value="">-- Không chọn (random domain) --</option>
+      <% domains.forEach(function(d) { %>
+        <option value="<%= d %>"><%= d %></option>
+      <% }) %>
+    </select>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Tạo Email</button>
+</form>
+
+<a href="/" class="btn btn-secondary">Quay lại Trang chủ</a>
+<a href="/emails" class="btn btn-secondary">Quay lại Danh sách Email</a>
